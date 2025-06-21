@@ -81,7 +81,22 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                ItemsWidget(), // Updated ItemsWidget should now fit
+// Show best sellers
+                ItemsWidget(bestSellers: true),
+                Container(
+                  alignment: Alignment.centerLeft,
+                  margin: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+                  child: const Text(
+                    "More Products",
+                    style: TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ),
+                ItemsWidget(bestSellers: false, regular: true), // See below for update
+                // Updated ItemsWidget should now fit
               ],
             ),
           ),

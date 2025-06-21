@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/HomeAppBar.dart';
-import '../utils/wishlist_manager.dart';
-import '../utils/cart_manager.dart'; // Import cart manager
+import '../services/wishlist_service.dart';
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({Key? key}) : super(key: key);
@@ -11,13 +9,27 @@ class WishlistPage extends StatefulWidget {
 }
 
 class _WishlistPageState extends State<WishlistPage> {
+  late Future<List<Map<String, dynamic>>> _futureWishlist;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureWishlist = WishlistService.fetchWishlist();
+  }
+
+  void _removeFromWishlist(int productId) async {
+    await WishlistService.removeFromWishlist(productId);
+    setState(() {
+      _futureWishlist = WishlistService.fetchWishlist();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Removed from Wishlist!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: PreferredSize(
-      //   preferredSize: const Size.fromHeight(120),
-      //   child: HomeAppBar(),
-      // ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -41,62 +53,55 @@ class _WishlistPageState extends State<WishlistPage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: wishlistItems.isEmpty
-                  ? const Center(child: Text('Your wishlist is empty.'))
-                  : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: wishlistItems.length,
-                itemBuilder: (context, index) {
-                  final item = wishlistItems[index];
-                  return ListTile(
-                    leading: Image.asset(
-                      item['image']!,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                    ),
-                    title: Text(item['name']!),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item['description']!),
-                        Text(item['price']!),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.add_shopping_cart, color: Colors.green),
-                          onPressed: () {
-                            setState(() {
-                              // Add item to cart
-                              cartItems.add({
-                                'name': item['name']!,
-                                'description': item['description']!,
-                                'price': item['price']!,
-                                'image': item['image']!,
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Added to Cart!')),
-                              );
-                            });
-                          },
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _futureWishlist,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('Your wishlist is empty.'));
+                  }
+                  final wishlistItems = snapshot.data!;
+                  return ListView.builder(
+                    itemCount: wishlistItems.length,
+                    itemBuilder: (context, index) {
+                      final item = wishlistItems[index];
+                      return ListTile(
+                        leading: item['image_url'] != null
+                            ? Image.network(
+                          item['image_url'],
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                        )
+                            : Icon(Icons.image, size: 50),
+                        title: Text(item['name'] ?? ''),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item['description'] ?? ''),
+                            Text('\$${item['price'] ?? ''}'),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              wishlistItems.removeAt(index);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Removed from Wishlist!')),
-                              );
-                            });
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.add_shopping_cart, color: Colors.green),
+                              onPressed: () {
+                                // Implement add to cart API if needed
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _removeFromWishlist(item['product_id']),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),

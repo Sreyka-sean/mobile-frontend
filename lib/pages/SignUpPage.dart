@@ -1,115 +1,92 @@
 import 'package:flutter/material.dart';
-import '../widgets/HomeAppBar.dart';
+import '../services/api_service.dart';
 
-class SignUpPage extends StatelessWidget {
+class SignUpPage extends StatefulWidget {
+  @override
+  State<SignUpPage> createState() => _SignUpPageState();
+}
+
+class _SignUpPageState extends State<SignUpPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+
+  bool _registered = false;
+  String _message = '';
+  dynamic _user; // Store the user object if needed
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (!_registered) ...[
+              TextField(
+                controller: _emailController,
+                decoration: InputDecoration(labelText: 'Email'),
               ),
-              const SizedBox(height: 20),
-              const Text(
-                'WELCOME TO',
-                style: TextStyle(fontSize: 24, color: Colors.black),
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
               ),
-              const Text(
-                'GREEN FARM',
-                style: TextStyle(
-                  fontSize: 32,
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(labelText: 'Name'),
+              ),
+              TextField(
+                controller: _phoneController,
+                decoration: InputDecoration(labelText: 'Phone'),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  final user = await ApiService.registerUser(
+                    _emailController.text,
+                    _passwordController.text,
+                    _nameController.text,
+                    _phoneController.text,
+                  );
+                  if (user != null) {
+                    setState(() {
+                      _registered = true;
+                      _message = 'Registered successfully!';
+                      _user = user;
+                    });
+                  } else {
+                    setState(() {
+                      _message = 'Registration failed';
+                    });
+                  }
+                },
+                child: Text('Sign up'),
+              ),
+              if (_message.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Text(_message, style: TextStyle(color: Colors.red)),
                 ),
+            ] else ...[
+              Icon(Icons.check_circle, color: Colors.green, size: 80),
+              SizedBox(height: 20),
+              Text(
+                _message,
+                style: TextStyle(fontSize: 20, color: Colors.green),
               ),
-              const SizedBox(height: 40),
-              const Text(
-                'Sign up',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Email or Phone number'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Confirm Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  // Add sign-up logic here (e.g., validate and navigate to HomePage)
-                  Navigator.pushNamed(context, '/HomePage');
+                  // Navigate to homepage, optionally pass user info
+                  Navigator.pushReplacementNamed(context, '/');
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                ),
-                child: const Text(
-                  'Sign up',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 10,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.grey),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.g_mobiledata),
-                        SizedBox(width: 5),
-                        Text('Sign up with Google'),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.grey),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.facebook),
-                        SizedBox(width: 5),
-                        Text('Sign up with Facebook'),
-                      ],
-                    ),
-                  ),
-                ],
+                child: Text('Next'),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/HomeAppBar.dart';
-import '../utils/cart_manager.dart';
+import '../services/api_service.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({Key? key}) : super(key: key);
@@ -10,6 +10,54 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
+  List<Map<String, dynamic>> cartItems = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCartItems();
+  }
+
+  Future<void> _fetchCartItems() async {
+    setState(() {
+      isLoading = true;
+    });
+    final items = await ApiService.getCartItems();
+    setState(() {
+      cartItems = items;
+      isLoading = false;
+    });
+  }
+
+  Future<void> _removeCartItem(String itemId) async {
+    final success = await ApiService.removeCartItem(itemId);
+    if (success) {
+      setState(() {
+        cartItems.removeWhere((item) => item['id'].toString() == itemId);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removed from Cart!')),
+      );
+    }
+  }
+
+  Future<void> _checkout() async {
+    final success = await ApiService.checkoutCart();
+    if (success) {
+      setState(() {
+        cartItems.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Checkout successful!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Checkout failed!')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,39 +88,34 @@ class _CartPageState extends State<CartPage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: cartItems.isEmpty
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : cartItems.isEmpty
                   ? const Center(child: Text('Your cart is empty.'))
                   : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
                 itemCount: cartItems.length,
                 itemBuilder: (context, index) {
                   final item = cartItems[index];
                   return ListTile(
-                    leading: Image.asset(
-                      item['image']!,
+                    leading: item['image'] != null
+                        ? Image.network(
+                      item['image'],
                       width: 50,
                       height: 50,
                       fit: BoxFit.cover,
-                    ),
-                    title: Text(item['name']!),
+                    )
+                        : const Icon(Icons.image, size: 50),
+                    title: Text(item['name'] ?? ''),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item['description']!),
-                        Text(item['price']!),
+                        Text(item['description'] ?? ''),
+                        Text(item['price'] != null ? '\$${item['price']}' : ''),
                       ],
                     ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          cartItems.removeAt(index);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Removed from Cart!')),
-                          );
-                        });
-                      },
+                      onPressed: () => _removeCartItem(item['id'].toString()),
                     ),
                   );
                 },
@@ -80,12 +123,7 @@ class _CartPageState extends State<CartPage> {
             ),
             if (cartItems.isNotEmpty)
               ElevatedButton(
-                onPressed: () {
-                  // Navigate to checkout or process order
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Proceeding to Checkout')),
-                  );
-                },
+                onPressed: _checkout,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   shape: RoundedRectangleBorder(

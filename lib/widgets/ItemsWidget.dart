@@ -1,190 +1,230 @@
 import 'package:flutter/material.dart';
-import '../utils/wishlist_manager.dart'; // Import the wishlist manager
+import '../models/product.dart';
+import '../services/product_service.dart';
+import '../services/wishlist_service.dart';
 import '../utils/cart_manager.dart';
 
-
 class ItemsWidget extends StatefulWidget {
-  const ItemsWidget({Key? key}) : super(key: key);
+  final bool bestSellers;
+  final bool regular;
+  const ItemsWidget({Key? key, this.bestSellers = false, this.regular = false}) : super(key: key);
 
   @override
   _ItemsWidgetState createState() => _ItemsWidgetState();
 }
 
 class _ItemsWidgetState extends State<ItemsWidget> {
-  final List<Product> products = List.generate(
-    7,
-        (index) => Product(
-      'Product Title ${index + 1}',
-      'Write description of product ${index + 1}',
-      '\$55',
-      'images/${index + 1}.jpg',
-    ),
-  );
+  late Future<List<Product>> _futureProducts;
+  List<Map<String, dynamic>> _wishlist = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.bestSellers) {
+      _futureProducts = ProductService.fetchBestSellers();
+    } else if (widget.regular) {
+      _futureProducts = ProductService.fetchRegularProducts();
+    } else {
+      _futureProducts = ProductService.fetchProducts();
+    }
+    _loadWishlist();
+  }
+
+  void _loadWishlist() async {
+    try {
+      final wishlist = await WishlistService.fetchWishlist();
+      setState(() {
+        _wishlist = wishlist;
+      });
+    } catch (e) {}
+  }
+
+  bool _isInWishlist(int productId) {
+    return _wishlist.any((item) => item['product_id'] == productId || item['id'] == productId);
+  }
+
+  void _toggleWishlist(Product product) async {
+    if (_isInWishlist(product.id)) {
+      await WishlistService.removeFromWishlist(product.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removed from Wishlist!')),
+      );
+    } else {
+      await WishlistService.addToWishlist(product.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Added to Wishlist!')),
+      );
+    }
+    _loadWishlist();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      childAspectRatio: 0.75, // Increased from 0.68 to allow more height
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      children: List.generate(
-        products.length,
-            (index) {
-          final product = products[index];
-          bool isInWishlist = wishlistItems.any((item) => item['name'] == product.name);
+    return FutureBuilder<List<Product>>(
+        future: _futureProducts,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No products found.'));
+          }
+          final products = snapshot.data!;
+          return GridView.count(
+            childAspectRatio: 0.75,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            children: List.generate(
+              products.length,
+                  (index) {
+                final product = products[index];
+                bool isInWishlist = _isInWishlist(product.id);
 
-          return Container(
-            padding: const EdgeInsets.only(left: 15, right: 15, top: 10),
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 1),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        "-50%",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        isInWishlist ? Icons.favorite : Icons.favorite_border,
-                        color: isInWishlist ? Colors.red : Colors.grey,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          if (!isInWishlist) {
-                            wishlistItems.add({
-                              'name': product.name,
-                              'description': product.description,
-                              'price': product.price,
-                              'image': product.image,
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Added to Wishlist!')),
-                            );
-                          } else {
-                            wishlistItems.removeWhere((item) => item['name'] == product.name);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Removed from Wishlist!')),
-                            );
-                          }
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                Flexible(
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        'itemPage',
-                        arguments: product,
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(8), // Reduced from 10
-                      child: Image.asset(
-                        product.image,
-                        height: 100, // Reduced from 120 to save space
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+                return Container(
+                  padding: const EdgeInsets.only(left: 15, right: 15, top: 10),
+                  margin: const EdgeInsets.symmetric(
+                      vertical: 8, horizontal: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.only(bottom: 6), // Reduced from 8
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 16, // Reduced from 18
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Container(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    product.description,
-                    style: const TextStyle(
-                      fontSize: 9, // Reduced from 10
-                      color: Colors.lightGreen,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 10
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        product.price,
-                        style: const TextStyle(
-                          fontSize: 14, // Reduced from 16
-                          fontWeight: FontWeight.bold,
-                          color: Colors.lightGreen,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              "-50%",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              isInWishlist ? Icons.favorite : Icons
+                                  .favorite_border,
+                              color: isInWishlist ? Colors.red : Colors.grey,
+                            ),
+                            onPressed: () => _toggleWishlist(product),
+                          ),
+                        ],
+                      ),
+                      Flexible(
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              'itemPage',
+                              arguments: product,
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.all(8),
+                            child: product.images.isNotEmpty
+                                ? Image.network(
+                              product.images[0],
+                              height: 100,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            )
+                                : Icon(Icons.image, size: 80),
+                          ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.shopping_cart_checkout,
-                          color: Colors.lightGreen,
-                          size: 20, // Added size to reduce icon footprint
+                      Container(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          product.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            if (!cartItems.any((cartItem) => cartItem['name'] == product.name)) {
-                              cartItems.add({
-                                'name': product.name,
-                                'description': product.description,
-                                'price': product.price,
-                                'image': product.image,
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Added to Cart!')),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Item already in Cart!')),
-                              );
-                            }
-                          });
-                        },
+                      ),
+                      Container(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          product.description,
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.lightGreen,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '\$${product.price.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.lightGreen,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.shopping_cart_checkout,
+                                color: Colors.lightGreen,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  if (!cartItems.any((cartItem) =>
+                                  cartItem['id'] == product.id)) {
+                                    cartItems.add({
+                                      'id': product.id,
+                                      'name': product.name,
+                                      'description': product.description,
+                                      'price': product.price,
+                                      'image': product.images.isNotEmpty
+                                          ? product.images[0]
+                                          : '',
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text('Added to Cart!')),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text(
+                                          'Item already in Cart!')),
+                                    );
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
           );
-        },
-      ),
-    );
+        });
   }
 }
